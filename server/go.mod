@@ -3,7 +3,6 @@ module server
 go 1.19
 
 require (
-	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/rs/zerolog v1.31.0
 )

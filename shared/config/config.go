@@ -9,24 +9,44 @@ import (
 )
 
 type Config struct {
-	Port string
-	Address string
-	StoragePath string
-	LogLevel string
+	Port        string `default:"8080"`
+	Address     string `default:"localhost"`
+	StoragePath string `default:"storage"`
+	LogLevel    string `default:"debug"`
 }
 
 func LoadConfig() Config {
-	err := godotenv.Load() 
+
+	port := "8080"
+	address := "localhost"
+	storagePath := "storage"
+	logLevel := "debug"
+
+	err := godotenv.Load()
 	if err != nil {
-		log.Fatal().Msgf("Error loading .env file: %v", err)
-		panic(err)
+		log.Info().Msgf("Error while reading .env file. environment or default values will be used")
+	}
+
+	if os.Getenv("SERVER_PORT") != "" {
+		port = os.Getenv("SERVER_PORT")
+	}
+	if os.Getenv("SERVER_ADDRESS") != "" {
+		address = os.Getenv("SERVER_ADDRESS")
+	}
+
+	if os.Getenv("STORAGE_PATH") != "" {
+		storagePath = os.Getenv("STORAGE_PATH")
+	}
+
+	if os.Getenv("LOG_LEVEL") != "" {
+		logLevel = os.Getenv("LOG_LEVEL")
 	}
 
 	return Config{
-		Port: os.Getenv("SERVER_PORT"),
-		Address: os.Getenv("SERVER_ADDRESS"),
-		StoragePath: os.Getenv("STORAGE_PATH"),
-		LogLevel: os.Getenv("LOG_LEVEL"),
+		Port:        port,
+		Address:     address,
+		StoragePath: storagePath,
+		LogLevel:    logLevel,
 	}
 }
 

@@ -1,0 +1,6 @@
+*.txt
+build/
+storage/
+files/
+client
+server

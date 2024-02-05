@@ -1,0 +1,32 @@
+version: '3.8'
+services:
+  server:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+      target: server
+    environment:
+      - SERVER_PORT=${SERVER_PORT}
+      - SERVER_ADDRESS=${SERVER_ADDRESS}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - STORAGE_PATH=${STORAGE_PATH}
+    ports:
+      - target: 8080
+        published: ${SERVER_PORT}
+        mode: host
+
+  client:
+    depends_on:
+      - server
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+      target: client
+    volumes:
+      - ./client/files:/app/files
+    environment:
+      - SERVER_ADDRESS=server
+      - SERVER_PORT=${SERVER_PORT}
+      - LOG_LEVEL=${LOG_LEVEL}
+
+    entrypoint: ["/app/client", "upload"]

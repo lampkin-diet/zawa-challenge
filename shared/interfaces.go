@@ -13,3 +13,17 @@ type IFileProvider interface {
 	// List returns the list of files in a directory
 	List(filename string) ([]string, error)
 }
+
+type IHashProvider interface {
+	Hash(data []byte) string
+	Hash2Nodes(left, right string) string
+}
+
+
+type IFileHashIterator interface {
+	Next() (string, bool)
+	Empty() bool
+	GetList() []string
+	GetFileProvider() IFileProvider
+	GetHashProvider() IHashProvider
+}

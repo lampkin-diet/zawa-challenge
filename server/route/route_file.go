@@ -3,6 +3,8 @@ package route
 import (
 	"fmt"
 	. "shared"
+	. "shared/provider"
+	. "shared/merkle"
 
 	"net/http"
 
@@ -13,6 +15,8 @@ import (
 type FileRouter struct {
 	// FileProvider
 	fileProvider IFileProvider
+	hashProvider IHashProvider
+	fileHashIterator IFileHashIterator
 }
 
 func (f *FileRouter) Get(c echo.Context) error {
@@ -33,6 +37,7 @@ func (f *FileRouter) Get(c echo.Context) error {
 func (f *FileRouter) Post(c echo.Context) error {
 	// Check if file exists
 	log.Info().Msg("Uploading files...")
+	fileNames := []string{}
 
 	parsed, err := c.MultipartForm()
 	if err != nil {
@@ -60,12 +65,20 @@ func (f *FileRouter) Post(c echo.Context) error {
 			log.Error().Err(err).Msg("Error while writing file: " + err.Error())
 			return c.String(http.StatusInternalServerError, "Internal Server Error while writing file")
 		}
+		fileNames = append(fileNames, file.Filename)
 	}
-	return c.String(http.StatusOK, "Files were uploaded")
+	// Generate MerkleTree
+	fileHashIterator := NewFileHashIterator(fileNames, f.hashProvider, f.fileProvider)
+	merkleTree := NewMerkleTree(fileHashIterator)
+
+	log.Info().Msg("Merkle tree generated: " + merkleTree.Root.Hash)
+
+	return c.String(http.StatusOK, "Files were uploaded successfully")
 }
 
 func NewFileRouter(fileProvider IFileProvider) *FileRouter {
 	return &FileRouter{
 		fileProvider: fileProvider,
+		hashProvider: NewSha256HashProvider(),
 	}
 }

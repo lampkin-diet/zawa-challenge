@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"path/filepath"
 	. "shared"
+	. "shared/merkle"
+	. "shared/provider"
 
 	resty "github.com/go-resty/resty/v2"
 	"github.com/rs/zerolog/log"
@@ -51,6 +53,12 @@ func (f *FileService) UploadDir(path string, c *Context) error {
 		request.SetFileReader("files", filepath.Base(file), bytes.NewReader(fileBytes))
 	}
 
+	// Compute Merkle Tree
+
+	fileHashIterator := NewFileHashIterator(files, NewSha256HashProvider(), f.fileProvider)
+	merkleTree := NewMerkleTree(fileHashIterator)
+	log.Info().Msg(fmt.Sprintf("Merkle Root: %s", merkleTree.GetRootHash()))
+
 	log.Debug().Msg(fmt.Sprintf("Uploading files to: %v", f.RoutePrefix))
 
 	// Send request
@@ -64,7 +72,7 @@ func (f *FileService) UploadDir(path string, c *Context) error {
 		return errors.New(resp.String())
 	}
 
-	log.Debug().Msg("Upload response: " + resp.String())
+	log.Info().Msg("Upload response: " + resp.String())
 	return nil
 }
 
