@@ -1,11 +1,15 @@
 package merkle
 
 import (
+	"fmt"
 	. "shared"
+
+	"github.com/rs/zerolog/log"
 )
 
 type MerkleTree struct {
-	Root *MerkleNode
+	Root         *MerkleNode
+	HashProvider IHashProvider
 }
 
 type MerkleNode struct {
@@ -16,6 +20,59 @@ type MerkleNode struct {
 
 func (m *MerkleTree) GetRootHash() string {
 	return m.Root.Hash
+}
+
+func (m *MerkleTree) MakeProof(targetHash string) (*Proof, error) {
+	proof := []string{}
+	// 0 - left, 1 - right
+	indices := []int64{}
+
+	// Walk the tree
+	var walk func(node *MerkleNode) bool
+	walk = func(node *MerkleNode) bool {
+		if node.Left == nil && node.Right == nil {
+			if node.Hash == targetHash {
+				return true
+			}
+			return false
+		}
+		if node.Left != nil {
+			if walk(node.Left) {
+				proof = append(proof, node.Right.Hash)
+				indices = append(indices, 0)
+				return true
+			}
+		}
+		if node.Right != nil {
+			if walk(node.Right) {
+				proof = append(proof, node.Left.Hash)
+				indices = append(indices, 1)
+				return true
+			}
+		}
+		return false
+	}
+
+	if !walk(m.Root) {
+		return nil, fmt.Errorf("Hash " + targetHash + " not found in the tree")
+	}
+
+	return &Proof{Hashes: proof, RootHash: m.GetRootHash(), Indices	: indices}, nil
+}
+
+func (m *MerkleTree) VerifyProof(targetHash string, proof *Proof) bool {
+	// Index 0 - left, 1 - right
+	log.Debug().Msg(fmt.Sprintf("Proof indeces are: %v", proof.Indices))
+	hash := targetHash
+	for i, index := range proof.Indices {
+		if index == 0 {
+			hash = m.HashProvider.Hash2Nodes(hash, proof.Hashes[i])
+		} else {
+			hash = m.HashProvider.Hash2Nodes(proof.Hashes[i], hash)
+		}
+	}
+	return hash == proof.RootHash
+
 }
 
 func BuildMerkleTree(hashes []string, hashProvider IHashProvider) *MerkleTree {
@@ -39,25 +96,10 @@ func BuildMerkleTree(hashes []string, hashProvider IHashProvider) *MerkleTree {
 		}
 		nodes = newLevel
 	}
-	return &MerkleTree{Root: &nodes[0]}
+	return &MerkleTree{Root: &nodes[0], HashProvider: hashProvider}
 }
 
-func NewMerkleTree(fileHashIterator IFileHashIterator) *MerkleTree {
-	var hashes []string
-
-	hash, ok := fileHashIterator.Next()
-
-	for ok {
-		hash, ok = fileHashIterator.Next()
-		hashes = append(hashes, hash)
-	}
-	if len(hashes) == 0 {
-		return nil
-	}
-
-	if len(hashes) != len(fileHashIterator.GetList()) {
-		return nil
-	}
-
-	return BuildMerkleTree(hashes, fileHashIterator.GetHashProvider())
+func NewMerkleTree(hashes []string, hashProvider IHashProvider) *MerkleTree {
+	log.Debug().Msg(fmt.Sprintf("Building merkle tree with hashes: %v", hashes))
+	return BuildMerkleTree(hashes, hashProvider)
 }

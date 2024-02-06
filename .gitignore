@@ -4,3 +4,5 @@ storage/
 files/
 client
 server
+launch.json
+```

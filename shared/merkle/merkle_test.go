@@ -1,15 +1,17 @@
 package merkle_test
 
 import (
-	"testing"
+	"fmt"
+	. "shared"
 	. "shared/merkle"
 	. "shared/provider"
+	"testing"
 )
 
 func TestBuildMerkleTree(t *testing.T) {
 	hashProvider := &Sha256HashProvider{}
 	hashes := []string{"hash1", "hash2", "hash3", "hash4"}
-	tree := BuildMerkleTree(hashes, hashProvider)
+	tree := NewMerkleTree(hashes, hashProvider)
 	if tree.Root == nil {
 		t.Error("Root is nil")
 	}
@@ -42,4 +44,61 @@ func TestBuildMerkleTreeOddCount(t *testing.T) {
 		t.Error("Right hash is not correct")
 	}
 
+}
+
+//                           root
+//               sha256("${sha256("hash1hash2")${sha256("hash3hash4")}")
+//    sha256("hash1hash2")            sha256("hash3hash4")
+// hash1                 hash2      hash3              hash4
+
+// Expected proof for hash1: [hash2, sha256("hash3hash4")]
+func TestMakeProof(t *testing.T) {
+	expectedProof := []string{"hash2", NewSha256HashProvider().Hash2Nodes("hash3", "hash4")}
+	expectedIndices := []int64{1, 1}
+	targetHash := "hash1"
+
+	hashProvider := &Sha256HashProvider{}
+	hashes := []string{"hash1", "hash2", "hash3", "hash4"}
+	tree := BuildMerkleTree(hashes, hashProvider)
+	if tree.Root == nil {
+		t.Error("Root is nil")
+	}
+	// Walk the tree
+	proof, _ := tree.MakeProof(targetHash)
+	if proof == nil {
+		t.Error("Proof is nil")
+	}
+
+	for i, hash := range proof.Hashes {
+		if hash != expectedProof[i] {
+			t.Error(fmt.Sprintf("Proof is not correct: %s", hash))
+		}
+		if proof.Indices[i] != expectedIndices[i] {
+			t.Error(fmt.Sprintf("Indexes is not correct: %d", proof.Indices[i]))
+		}
+	}
+}
+
+func TestVerifyProof(t *testing.T) {
+	targetHash := "hash1"
+	hashProvider := &Sha256HashProvider{}
+	hashes := []string{"hash1", "hash2", "hash3", "hash4"}
+	tree := BuildMerkleTree(hashes, hashProvider)
+	expectedProof := &Proof{
+		Hashes:   []string{"hash2", NewSha256HashProvider().Hash2Nodes("hash3", "hash4")},
+		Indices:  []int64{1, 1},
+		RootHash: tree.GetRootHash(),
+	}
+	if tree.Root == nil {
+		t.Error("Root is nil")
+	}
+	// Walk the tree
+	proof, _ := tree.MakeProof(targetHash)
+	if proof == nil {
+		t.Error("Proof is nil")
+	}
+	// Verify the proof
+	if !tree.VerifyProof(targetHash, expectedProof) {
+		t.Error("Proof is not correct")
+	}
 }

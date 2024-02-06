@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"log"
 	. "shared"
 )
 
@@ -16,13 +17,11 @@ func (f *FileHashIterator) Next() (string, bool) {
 		return "", false
 	}
 	file := f.Files[f.Position]
-	// Get file content
-	content, err := f.FileProvider.GetFile(file)
+	// Get file hash
+	hash, err := f.GetFileHash(file)
 	if err != nil {
 		return "", false
 	}
-	// Hash file content
-	hash := f.HashProvider.Hash(content)
 	// Update position
 	f.Position++
 	return hash, true
@@ -32,8 +31,33 @@ func (f *FileHashIterator) Empty() bool {
 	return f.Position >= len(f.Files)
 }
 
-func (f *FileHashIterator) GetList() []string {
-	return f.Files
+func (f *FileHashIterator) Reset() {
+	f.Position = 0
+}
+
+func (f *FileHashIterator) StoreRootHash(rootHash string) error {
+	return f.FileProvider.WriteFile("root_hash", []byte(rootHash))
+}
+
+func (f *FileHashIterator) GetRootHash() (string, error) {
+	b, err := f.FileProvider.GetFile("root_hash")
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func (f *FileHashIterator) GetListHashes() []string {
+	hashes := make([]string, 0, len(f.Files))
+	for _, file := range f.Files {
+		hash, err := f.GetFileHash(file)
+		if err != nil {
+			log.Fatal(err)
+			return nil
+		}
+		hashes = append(hashes, hash)
+	}
+	return hashes
 }
 
 func (f *FileHashIterator) GetFileProvider() IFileProvider {
@@ -44,8 +68,21 @@ func (f *FileHashIterator) GetHashProvider() IHashProvider {
 	return f.HashProvider
 }
 
+func (f *FileHashIterator) GetFileHash(filename string) (string, error) {
+	content, err := f.FileProvider.GetFile(filename)
+	if err != nil {
+		return "", err
+	}
+	return f.HashProvider.Hash(content), nil
+}
 
-func NewFileHashIterator(files []string, hashProvider IHashProvider, fileProvider IFileProvider) *FileHashIterator {
+
+func NewFileHashIterator(hashProvider IHashProvider, fileProvider IFileProvider) *FileHashIterator {
+	files, err := fileProvider.List()
+	if err != nil {
+		log.Fatal(err)
+		return nil
+	}
 	return &FileHashIterator{
 		Files: files,
 		Position: 0,

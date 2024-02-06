@@ -11,7 +11,9 @@ type IFileProvider interface {
 	// WriteMultipartFile writes the file content from a multipart file
 	WriteMultipartFile(file *multipart.FileHeader) error
 	// List returns the list of files in a directory
-	List(filename string) ([]string, error)
+	List() ([]string, error)
+	// RemoveFile removes a file
+	RemoveFile(filename string) error
 }
 
 type IHashProvider interface {
@@ -19,11 +21,26 @@ type IHashProvider interface {
 	Hash2Nodes(left, right string) string
 }
 
-
 type IFileHashIterator interface {
 	Next() (string, bool)
 	Empty() bool
-	GetList() []string
+	StoreRootHash(rootHash string) error
+	GetRootHash() (string, error)
+	GetFileHash(filename string) (string, error)
+	GetListHashes() []string
 	GetFileProvider() IFileProvider
 	GetHashProvider() IHashProvider
+}
+
+type IMerkleTreeProvider interface {
+	GetRootHash() string
+	MakeProof(filename string) (*Proof, error)
+	VerifyProof(targetHash string, proof *Proof) (bool, error)
+	BuildTree() error
+}
+
+type IMerkleTree interface {
+	GetRootHash() string
+	MakeProof(targetHash string) (*Proof, error)
+	VerifyProof(targetHash string, proof *Proof) bool
 }

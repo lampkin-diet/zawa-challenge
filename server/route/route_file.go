@@ -1,10 +1,13 @@
 package route
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	. "shared"
 	. "shared/provider"
-	. "shared/merkle"
 
 	"net/http"
 
@@ -14,15 +17,17 @@ import (
 
 type FileRouter struct {
 	// FileProvider
-	fileProvider IFileProvider
-	hashProvider IHashProvider
-	fileHashIterator IFileHashIterator
+	fileProvider       IFileProvider
+	hashProvider       IHashProvider
+	fileHashIterator   IFileHashIterator
+	merkleTreeProvider IMerkleTreeProvider
 }
 
 func (f *FileRouter) Get(c echo.Context) error {
 	filename := c.Param("filename")
 	// Check if file exists
 	isExist, err := f.fileProvider.FileExists(filename)
+	log.Info().Msg(fmt.Sprintf("File %s exists: %v", filename, isExist))
 	if err != nil {
 		return c.String(http.StatusInternalServerError, "Internal Server Error while checking file existence")
 	}
@@ -30,8 +35,40 @@ func (f *FileRouter) Get(c echo.Context) error {
 	if !isExist {
 		return c.String(http.StatusNotFound, fmt.Sprintf("File %s not found", filename))
 	}
-	// Server the file
-	return c.File(filename)
+	// Serve the file
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error while creating form file: "+err.Error())
+	}
+	file, err := f.fileProvider.GetFile(filename)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error while getting file: "+err.Error())
+	}
+	_, err = io.Copy(part, bytes.NewReader(file))
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error while copying file: "+err.Error())
+	}
+
+	// Compile proof for sending
+	proof, err := f.merkleTreeProvider.MakeProof(filename)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error while making proof: "+err.Error())
+	}
+	jsonProof, err := json.Marshal(proof)
+	writer.CreateFormField("proof")
+	writer.WriteField("proof", string(jsonProof))
+
+	writer.Close()
+	c.Response().Header().Set(echo.HeaderContentType, writer.FormDataContentType())
+	c.Response().WriteHeader(http.StatusOK)
+
+	_, err = c.Response().Write(body.Bytes())
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error while writing response")
+	}
+	return nil
 }
 
 func (f *FileRouter) Post(c echo.Context) error {
@@ -68,17 +105,22 @@ func (f *FileRouter) Post(c echo.Context) error {
 		fileNames = append(fileNames, file.Filename)
 	}
 	// Generate MerkleTree
-	fileHashIterator := NewFileHashIterator(fileNames, f.hashProvider, f.fileProvider)
-	merkleTree := NewMerkleTree(fileHashIterator)
+	f.merkleTreeProvider.BuildTree()
 
-	log.Info().Msg("Merkle tree generated: " + merkleTree.Root.Hash)
+	log.Info().Msg("Merkle tree generated: " + f.merkleTreeProvider.GetRootHash())
 
 	return c.String(http.StatusOK, "Files were uploaded successfully")
 }
 
-func NewFileRouter(fileProvider IFileProvider) *FileRouter {
+func NewFileRouter(fileProvider IFileProvider, hashProvider IHashProvider, merkleTreeProvider IMerkleTreeProvider) *FileRouter {
+	// Build tree if there are files
+	files, _ := fileProvider.List()
+	if len(files) > 0 {
+		merkleTreeProvider.BuildTree()
+	}
 	return &FileRouter{
-		fileProvider: fileProvider,
-		hashProvider: NewSha256HashProvider(),
+		fileProvider:       fileProvider,
+		hashProvider:       NewSha256HashProvider(),
+		merkleTreeProvider: merkleTreeProvider,
 	}
 }

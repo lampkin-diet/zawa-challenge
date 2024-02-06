@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"path/filepath"
+	. "shared"
 	. "shared/config"
 	. "shared/provider"
-	. "shared"
+	"strconv"
 
 	resty "github.com/go-resty/resty/v2"
 	"github.com/rs/zerolog/log"
@@ -29,7 +29,6 @@ func main() {
 	var (
 		fileProvider IFileProvider
 		fileService  IFileService
-		proofManager IProofManager
 	)
 	
 	config := LoadConfig()
@@ -37,21 +36,17 @@ func main() {
 
 	// Create file provider and services
 	fileProvider = NewFileProvider(config.StoragePath)
-	fileService = NewFileService(fileProvider)
-	proofManager = NewProofManager()
-
 	// Check that paths are correct
-	pathToFiles, err := filepath.Abs(config.StoragePath)
-	log.Debug().Msg(fmt.Sprintf("Path to files: %s", pathToFiles))
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to get absolute path to storage")
+	if fileProvider == nil {
+		log.Fatal().Msg("Path " + config.StoragePath + " to directory with files does not exist. Please configure STORAGE_PATH in .env file correctly")
 		return
 	}
-	isExist, err := fileProvider.FileExists(pathToFiles)
-	if !isExist {
-		log.Fatal().Err(err).Msg("Path to directory with files does not exist. Please configure STORAGE_PATH in .env file correctly")
-		return
-	}
+
+	hashProvider := NewSha256HashProvider()
+	fileHashIterator := NewFileHashIterator(hashProvider, fileProvider)
+	merkleTreeProvider := NewMerkleTreeProvider(fileHashIterator)
+
+	fileService = NewFileService(fileProvider, fileHashIterator, hashProvider, merkleTreeProvider)
 
 	context := &Context{
 		client: resty.New(),
@@ -65,19 +60,11 @@ func main() {
 		Short: "Upload files",
 		Long:  "Upload files to the server",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(fileService.UploadDir(pathToFiles, context))
-		},
-	}
-
-	proofCmd := &cobra.Command{
-		Use:   "proof <name of file to proof>",
-		Args:  cobra.ExactArgs(1),
-		Short: "Get proof for files",
-		Long:  "Get proof for files from the server",
-		Run: func(cmd *cobra.Command, args []string) {
-			filename := args[0]
-			proof := proofManager.GetProof(filename, context)
-			fmt.Println("Proof that file is not changed: ", proof)
+			err := fileService.Upload(context)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
 		},
 	}
 
@@ -97,9 +84,30 @@ func main() {
 		},
 	}
 
+	generateFileCmd := &cobra.Command{
+		Use:   "generate <number of files to generate>",
+		Args: func (c *cobra.Command, args []string) error {
+			if len(args) != 1 {
+				return fmt.Errorf("Invalid number of arguments")
+			}
+			if _, err := strconv.Atoi(args[0]); err != nil {
+				return fmt.Errorf("Invalid number of files")
+			}
+			return nil
+		},
+		Short: "Generate files",
+		Long:  "Generate files to the storage",
+		Run: func(cmd *cobra.Command, args []string) {
+			count, _ := strconv.Atoi(args[0])
+			for i := 0; i < count; i++ {
+				fileProvider.WriteFile(fmt.Sprintf("file%d", i), []byte(fmt.Sprintf("file%d", i)))
+			}
+		},
+	}
+
 	rootCmd.AddCommand(uploadCmd)
-	rootCmd.AddCommand(proofCmd)
 	rootCmd.AddCommand(downloadCmd)
+	rootCmd.AddCommand(generateFileCmd)
 
 	rootCmd.Execute()
 }

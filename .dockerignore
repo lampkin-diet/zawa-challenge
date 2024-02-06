@@ -2,3 +2,4 @@ server/server
 client/client
 client/files
 server/storage
+launch.json

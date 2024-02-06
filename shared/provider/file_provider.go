@@ -11,22 +11,29 @@ import (
 )
 
 type FileProvider struct {
-	StoragePrefix string
+	StorageDir string
+}
+
+func (f *FileProvider) GetFullPath(filename string) string {
+	return filepath.Join(f.StorageDir, filename)
 }
 
 func (f *FileProvider) GetFile(filename string) ([]byte, error) {
-	fpath := filepath.Join(f.StoragePrefix, filename)
+	log.Debug().Msg(fmt.Sprintf("Getting file: %s", filename))
+	fpath := f.GetFullPath(filename)
 	return os.ReadFile(fpath)
 }
 
 func (f *FileProvider) WriteFile(filename string, file []byte) error {
-	path := filepath.Join(f.StoragePrefix, filename)
+	path := f.GetFullPath(filename)
 	return os.WriteFile(path, file, os.ModePerm)
 }
 
-func (f *FileProvider) FileExists(fpath string) (bool, error) {
+func (f *FileProvider) FileExists(filename string) (bool, error) {
+	fpath := f.GetFullPath(filename)
 	log.Debug().Msg(fmt.Sprintf("Checking file/dir: %s", fpath))
 	stat, err := os.Stat(fpath)
+	log.Debug().Msg(fmt.Sprintf("Error: %v", err))
 	if err == nil {
 		return true, nil
 	}
@@ -56,8 +63,8 @@ func (f *FileProvider) WriteMultipartFile(file *multipart.FileHeader) error {
 	return f.WriteFile(file.Filename, fileContent)
 }
 
-func (f *FileProvider) List(path string) ([]string, error) {
-	files, err := os.ReadDir(path)
+func (f *FileProvider) List() ([]string, error) {
+	files, err := os.ReadDir(f.StorageDir)
 	if err != nil {
 		return nil, err
 	}
@@ -68,6 +75,15 @@ func (f *FileProvider) List(path string) ([]string, error) {
 	return list, nil
 }
 
+func (f *FileProvider) RemoveFile(filename string) error {
+	return os.Remove(f.GetFullPath(filename))
+}
+
 func NewFileProvider(storagePrefix string) *FileProvider {
-	return &FileProvider{StoragePrefix: storagePrefix}
+	fpath, err := filepath.Abs(storagePrefix)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Error while getting absolute path: " + err.Error())
+		return nil
+	}
+	return &FileProvider{StorageDir: fpath}
 }

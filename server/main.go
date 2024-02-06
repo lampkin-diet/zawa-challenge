@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog/log"
@@ -24,10 +22,18 @@ func serve() {
 	e.Use(middleware.Recover())
 	
 	// Preps
-	cwd, _ := os.Getwd()
-	fileProvider := NewFileProvider(cwd + "/storage")
-	fileRouter := NewFileRouter(fileProvider)
-	proofRouter := NewProofRouter()
+	hashProvider := NewSha256HashProvider()
+
+	fileProvider := NewFileProvider(config.StoragePath)
+	// Check that paths are correct
+	if fileProvider == nil {
+		log.Fatal().Msg("Path " + config.StoragePath + " to directory with files does not exist. Please configure STORAGE_PATH in .env file correctly")
+		return
+	}
+	fileHashIterator := NewFileHashIterator(hashProvider, fileProvider)
+	merkleTreeProvider := NewMerkleTreeProvider(fileHashIterator)
+
+	fileRouter := NewFileRouter(fileProvider, hashProvider, merkleTreeProvider)
 	
 	// File routes
 	e.GET("/files/:filename", func(c echo.Context) error {
@@ -35,10 +41,6 @@ func serve() {
 	})
 	e.POST("/files", func(c echo.Context) error {
 		return fileRouter.Post(c)
-	})
-	// Proof routes
-	e.GET("/proof/:file", func(c echo.Context) error {
-		return proofRouter.Get(c)
 	})
 
 	e.Debug = true
