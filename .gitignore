@@ -5,4 +5,4 @@ files/
 client
 server
 launch.json
-```
+.vscode/
