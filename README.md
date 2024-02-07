@@ -19,8 +19,19 @@ The server is implemented using `echo` framework. It has 2 endpoints:
 - `GET /download` - for downloading files
 
 The server stores files in file system and calculates the Merkle Tree when the file should be downloaded. The server sends the file with the Merkle Proof to the client. It utilizes `mime/multipart` content-type and includes 2 fields:
+
 - `file` - the file itself. (Bytes)
 - `proof` - the Merkle Proof. (JSON). The proof is a list of hashes and indices of the blocks in the tree.
+
+Proof format is:
+
+```json
+{
+    "Hashes": "[hash(f), hash(a)....]",     
+    "Indices": "[1, 0]",
+    "ProofHash": "rootHashhhhhhhhhhhhh",
+}
+```
 
 The client is implemented using `cli` framework. It has 3 commands:
 - `upload` - for uploading files
@@ -38,6 +49,7 @@ It's needed only for the client side for making the first check. If it's not the
 ### Hashes
 
 Hashes is a list of hashes from the root to the block. The first hash is the hash of the block, the last hash is the hash of the root. For example, if we have the following tree:
+
 ```
       root
      /    \
@@ -45,16 +57,20 @@ Hashes is a list of hashes from the root to the block. The first hash is the has
    / \    / \
   c   d  e   f
 ```
+
 hashes for the block `e` will be:
+
 ```
 "hashes": "hash(f), hash(a)"
 ```
+
 We don't need to send hash(e) cause it will be calculated on the client side from the File content. Also client store rootHash and can calculate it each time when the server sends the file with Merkle Proof.
 
 ### Indices
 
 Indices are indicates the directioin of the hash calculation. "0" means that hash came from the left child, "1" means that hash came from the right child.
 For example, if we have the following tree:
+
 ```
       root
      /    \
@@ -64,10 +80,12 @@ For example, if we have the following tree:
 ```
 
 The proof for the block `e` will be:
+
 ```
 "proof": {
-    "hashes": "hash(f), hash(a)",     
-    "indices": "1, 0"
+    "Hashes": "hash(f), hash(a)",     
+    "Indices": "1, 0"
+    "RootHash": "root"
 }
 ```
 
@@ -105,6 +123,7 @@ Demo is stored in `docker` folder and utilizes `docker-compose` for running the 
 ## Preps
 
 Go to `docker` folder and run the following command:
+
 ```bash
     docker compose build
 ```
@@ -112,11 +131,13 @@ Go to `docker` folder and run the following command:
 ## Run
 
 For running the demo use the following command:
+
 ```bash
     docker compose up
 ```
 
 Example of the output:
+
 ```text
 ~ docker compose up
 [+] Running 3/3
