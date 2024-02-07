@@ -1,6 +1,9 @@
-package shared
+package interfaces
 
-import "mime/multipart"
+import (
+	"mime/multipart"
+	. "shared/types"
+)
 
 type IFileProvider interface {
 	FileExists(filename string) (bool, error)
@@ -24,8 +27,9 @@ type IHashProvider interface {
 type IFileHashIterator interface {
 	Next() (string, bool)
 	Empty() bool
+	Reset()
 	StoreRootHash(rootHash string) error
-	GetRootHash() (string, error)
+	GetStoredRootHash() (string, error)
 	GetFileHash(filename string) (string, error)
 	GetListHashes() []string
 	GetFileProvider() IFileProvider

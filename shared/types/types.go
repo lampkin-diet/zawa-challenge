@@ -1,6 +1,4 @@
-package shared
-
-type ClientContext struct{}
+package types
 
 type Proof struct {
 	Hashes   []string `json:"ProofHashes"`

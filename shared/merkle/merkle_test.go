@@ -2,7 +2,7 @@ package merkle_test
 
 import (
 	"fmt"
-	. "shared"
+	. "shared/types"
 	. "shared/merkle"
 	. "shared/provider"
 	"testing"
@@ -54,7 +54,7 @@ func TestBuildMerkleTreeOddCount(t *testing.T) {
 // Expected proof for hash1: [hash2, sha256("hash3hash4")]
 func TestMakeProof(t *testing.T) {
 	expectedProof := []string{"hash2", NewSha256HashProvider().Hash2Nodes("hash3", "hash4")}
-	expectedIndices := []int64{1, 1}
+	expectedIndices := []int64{0, 0}
 	targetHash := "hash1"
 
 	hashProvider := &Sha256HashProvider{}
@@ -80,12 +80,12 @@ func TestMakeProof(t *testing.T) {
 }
 
 func TestVerifyProof(t *testing.T) {
-	targetHash := "hash1"
+	targetHash := "hash4"
 	hashProvider := &Sha256HashProvider{}
 	hashes := []string{"hash1", "hash2", "hash3", "hash4"}
 	tree := BuildMerkleTree(hashes, hashProvider)
 	expectedProof := &Proof{
-		Hashes:   []string{"hash2", NewSha256HashProvider().Hash2Nodes("hash3", "hash4")},
+		Hashes:   []string{"hash3", NewSha256HashProvider().Hash2Nodes("hash1", "hash2")},
 		Indices:  []int64{1, 1},
 		RootHash: tree.GetRootHash(),
 	}

@@ -22,10 +22,8 @@ func LoadConfig() Config {
 	storagePath := "storage"
 	logLevel := "debug"
 
-	err := godotenv.Load()
-	if err != nil {
-		log.Info().Msgf("Error while reading .env file. environment or default values will be used")
-	}
+	// Load .env file
+	godotenv.Load()
 
 	if os.Getenv("SERVER_PORT") != "" {
 		port = os.Getenv("SERVER_PORT")

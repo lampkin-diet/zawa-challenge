@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
-	. "shared"
+	
+	. "shared/interfaces"
 	. "shared/provider"
 
 	"net/http"

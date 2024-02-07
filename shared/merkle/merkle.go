@@ -2,7 +2,8 @@ package merkle
 
 import (
 	"fmt"
-	. "shared"
+	. "shared/types"
+	. "shared/interfaces"
 
 	"github.com/rs/zerolog/log"
 )

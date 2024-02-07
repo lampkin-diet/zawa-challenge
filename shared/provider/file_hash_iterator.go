@@ -2,21 +2,21 @@ package provider
 
 import (
 	"log"
-	. "shared"
+	. "shared/interfaces"
 )
 
 type FileHashIterator struct {
-	Files []string
 	Position int
 	HashProvider IHashProvider
 	FileProvider IFileProvider
 }
 
 func (f *FileHashIterator) Next() (string, bool) {
-	if f.Position >= len(f.Files) {
+	files := f.List()
+	if f.Position >= len(f.List()) {
 		return "", false
 	}
-	file := f.Files[f.Position]
+	file := files[f.Position]
 	// Get file hash
 	hash, err := f.GetFileHash(file)
 	if err != nil {
@@ -27,8 +27,17 @@ func (f *FileHashIterator) Next() (string, bool) {
 	return hash, true
 }
 
+func (f *FileHashIterator) List() []string {
+	files, err := f.FileProvider.List()
+	if err != nil {
+		log.Fatal(err)
+		return nil
+	}
+	return files
+}
+
 func (f *FileHashIterator) Empty() bool {
-	return f.Position >= len(f.Files)
+	return f.Position >= len(f.List())
 }
 
 func (f *FileHashIterator) Reset() {
@@ -39,7 +48,7 @@ func (f *FileHashIterator) StoreRootHash(rootHash string) error {
 	return f.FileProvider.WriteFile("root_hash", []byte(rootHash))
 }
 
-func (f *FileHashIterator) GetRootHash() (string, error) {
+func (f *FileHashIterator) GetStoredRootHash() (string, error) {
 	b, err := f.FileProvider.GetFile("root_hash")
 	if err != nil {
 		return "", err
@@ -48,13 +57,10 @@ func (f *FileHashIterator) GetRootHash() (string, error) {
 }
 
 func (f *FileHashIterator) GetListHashes() []string {
-	hashes := make([]string, 0, len(f.Files))
-	for _, file := range f.Files {
-		hash, err := f.GetFileHash(file)
-		if err != nil {
-			log.Fatal(err)
-			return nil
-		}
+	defer f.Reset()
+
+	hashes := make([]string, 0, len(f.List()))
+	for hash, ok := f.Next(); ok; hash, ok = f.Next() {
 		hashes = append(hashes, hash)
 	}
 	return hashes
@@ -78,13 +84,7 @@ func (f *FileHashIterator) GetFileHash(filename string) (string, error) {
 
 
 func NewFileHashIterator(hashProvider IHashProvider, fileProvider IFileProvider) *FileHashIterator {
-	files, err := fileProvider.List()
-	if err != nil {
-		log.Fatal(err)
-		return nil
-	}
 	return &FileHashIterator{
-		Files: files,
 		Position: 0,
 		HashProvider: hashProvider,
 		FileProvider: fileProvider,

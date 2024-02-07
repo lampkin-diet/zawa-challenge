@@ -14,6 +14,7 @@ import (
 func serve() {
 	// Get Config
 	config := LoadConfig()
+	SetupLogger(config)
 
 	// Echo instance
 	e := echo.New()

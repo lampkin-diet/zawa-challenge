@@ -14,19 +14,19 @@ services:
       - target: 8080
         published: ${SERVER_PORT}
         mode: host
+    entrypoint: ["/bin/demo.sh"]
 
   client:
     depends_on:
       - server
+    network_mode: host
     build:
       context: ../
       dockerfile: docker/Dockerfile
       target: client
-    volumes:
-      - ./client/files:/app/files
     environment:
-      - SERVER_ADDRESS=server
+      - SERVER_ADDRESS=${SERVER_ADDRESS}
       - SERVER_PORT=${SERVER_PORT}
       - LOG_LEVEL=${LOG_LEVEL}
-
-    entrypoint: ["/app/client", "upload"]
+      - STORAGE_PATH=/app/files
+    entrypoint: ["/bin/demo.sh"]

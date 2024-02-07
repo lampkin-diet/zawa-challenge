@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	. "shared"
+	. "shared/interfaces"
 	. "shared/config"
 	. "shared/provider"
 	"strconv"
@@ -50,10 +50,11 @@ func main() {
 
 	context := &Context{
 		client: resty.New(),
+		isCorruptionNeeded: false,
 	}
-	log.Debug().Msg(fmt.Sprintf("Server address: %s:%s", config.Address, config.Port))
 	// Set base URL
 	context.client.SetBaseURL(fmt.Sprintf("http://%s:%s", config.Address, config.Port))
+	log.Debug().Msg(fmt.Sprintf("Server address: %s:%s", config.Address, config.Port))
 
 	uploadCmd := &cobra.Command{
 		Use:   "upload",
@@ -70,11 +71,14 @@ func main() {
 
 	downloadCmd := &cobra.Command{
 		Use:   "download <name of file to download>",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MinimumNArgs(1),
 		Short: "Download files",
-		Long:  "Download files from the server",
+		Long:  "Download files from the server. If --corrupt flag is set, the file will be corrupted and the proof will be invalid",
 		Run: func(cmd *cobra.Command, args []string) {
 			filename := args[0]
+			imitateDataCorruption, _ := cmd.Flags().GetBool("corrupt")
+			log.Debug().Msg(fmt.Sprintf("Imitate data corruption: %v", imitateDataCorruption))
+			context.isCorruptionNeeded = imitateDataCorruption
 			file, err := fileService.Get(filename, context)
 			if err != nil {
 				fmt.Println(err)
@@ -104,6 +108,8 @@ func main() {
 			}
 		},
 	}
+
+	downloadCmd.Flags().Bool("corrupt", false, "Imitate data corruption")
 
 	rootCmd.AddCommand(uploadCmd)
 	rootCmd.AddCommand(downloadCmd)

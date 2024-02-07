@@ -37,7 +37,15 @@ RUN apk update
 
 # Copy server binary
 COPY --from=builder /builder/bin/server /app/server
+COPY --from=builder /build/docker/demo-server.sh /bin/demo.sh
+RUN chmod +x /bin/demo.sh
 
+ARG SERVER_PORT
+ARG SERVER_ADDRESS
+ARG LOG_LEVEL
+ARG STORAGE_PATH
+
+# Set default values
 ENV SERVER_PORT=8080
 ENV SERVER_ADDRESS=localhost
 ENV LOG_LEVEL=debug
@@ -58,11 +66,21 @@ RUN apk update
 
 # Copy server binary
 COPY --from=builder /builder/bin/client /app/client
+COPY --from=builder /build/docker/demo-client.sh /bin/demo.sh
 
+RUN chmod +x /bin/demo.sh
+
+ARG SERVER_PORT
+ARG SERVER_ADDRESS
+ARG LOG_LEVEL
+ARG STORAGE_PATH
+
+# Set default values
 ENV SERVER_PORT=8080
 ENV SERVER_ADDRESS=localhost
 ENV LOG_LEVEL=debug
 ENV STORAGE_PATH=/app/files
+
 
 # Run server
 CMD ["/app/client"]

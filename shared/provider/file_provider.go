@@ -33,10 +33,10 @@ func (f *FileProvider) FileExists(filename string) (bool, error) {
 	fpath := f.GetFullPath(filename)
 	log.Debug().Msg(fmt.Sprintf("Checking file/dir: %s", fpath))
 	stat, err := os.Stat(fpath)
-	log.Debug().Msg(fmt.Sprintf("Error: %v", err))
 	if err == nil {
 		return true, nil
 	}
+	log.Debug().Msg(fmt.Sprintf("Error: %v", err))
 	if os.IsNotExist(err) {
 		return false, nil
 	}

@@ -1,8 +1,9 @@
 package provider
 
 import (
-	. "shared"
+	. "shared/interfaces"
 	. "shared/merkle"
+	. "shared/types"
 )
 
 type MerkleTreeProvider struct {
@@ -33,23 +34,10 @@ func (m *MerkleTreeProvider) BuildTree() error {
 }
 
 func NewMerkleTreeProvider(fileHashIterator IFileHashIterator) *MerkleTreeProvider {
-	var hashes []string
 	var tree = &MerkleTree{
 		Root:         nil,
 		HashProvider: fileHashIterator.GetHashProvider(),
 	}
-
-	hash, ok := fileHashIterator.Next()
-
-	for ok {
-		hashes = append(hashes, hash)
-		hash, ok = fileHashIterator.Next()
-	}
-
-	if len(hashes) > 0 {
-		tree = NewMerkleTree(hashes, fileHashIterator.GetHashProvider())
-	}
-
 	return &MerkleTreeProvider{
 		FileHashIterator: fileHashIterator,
 		Tree:             tree,

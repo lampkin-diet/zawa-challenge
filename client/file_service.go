@@ -10,7 +10,8 @@ import (
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
-	. "shared"
+	. "shared/interfaces"
+	. "shared/types"
 
 	resty "github.com/go-resty/resty/v2"
 	"github.com/rs/zerolog/log"
@@ -31,13 +32,14 @@ type DownloadFileResponse struct {
 
 type Context struct {
 	client *resty.Client
+	// That is only for demoing purposes to show that proof works
+	isCorruptionNeeded bool
 }
 
 func ParseMultipartResponse(resp *resty.Response) (*DownloadFileResponse, error) {
-	// I expect here only 3 parts
+	// I expect here only 2 parts
 	// 1. File
-	// 2. RootHash
-	// 3. Proof
+	// 2. Proof
 	downloadResponse := &DownloadFileResponse{
 		Proof: &Proof{},
 	}
@@ -75,7 +77,7 @@ func ParseMultipartResponse(resp *resty.Response) (*DownloadFileResponse, error)
 }
 
 func (f *FileService) Get(filename string, c *Context) ([]byte, error) {
-	log.Debug().Msg(fmt.Sprintf("Getting file: %s", filename))
+	log.Debug().Msg(fmt.Sprintf("Downloading file: %s", filename))
 
 	resp, err := c.client.R().
 		Get(f.RoutePrefix + "/" + filename)
@@ -87,12 +89,20 @@ func (f *FileService) Get(filename string, c *Context) ([]byte, error) {
 	}
 	// Parse multipart response
 	downloadResponse, err := ParseMultipartResponse(resp)
-	rootHash, err := f.fileHashIterator.GetRootHash()
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Error getting root hash: %v", err))
+		return nil, errors.New(fmt.Sprintf("Error getting stored root hash: %v", err))
+	}
+	rootHash, err := f.fileHashIterator.GetStoredRootHash()
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("Error getting stored root hash: %v", err))
 	}
 	if rootHash != downloadResponse.Proof.RootHash {
 		return nil, errors.New(fmt.Sprintf("Root hash mismatch: %s != %s", rootHash, downloadResponse.Proof.RootHash))
+	}
+	// Such a hack to show that proof works
+	if c.isCorruptionNeeded {
+		// Corrupt file
+		downloadResponse.File = []byte("Corrupted file")
 	}
 
 	// Verify proof
@@ -102,7 +112,7 @@ func (f *FileService) Get(filename string, c *Context) ([]byte, error) {
 	log.Debug().Msg(fmt.Sprintf("Target hash: %s", targetHash))
 	isValid, err := f.merkleTreeProvider.VerifyProof(targetHash, downloadResponse.Proof)
 	if !isValid {
-		return nil, errors.New("Invalid proof")
+		return nil, errors.New("Invalid proof. Seems like File is corrupted")
 	}
 
 	return downloadResponse.File, nil
@@ -111,11 +121,8 @@ func (f *FileService) Get(filename string, c *Context) ([]byte, error) {
 func (f *FileService) Upload(c *Context) error {
 	var request = c.client.R()
 	// Get list of files inside directory
-	files, err := f.fileProvider.List()
-	if err != nil {
-		return err
-	}
 	// Add files to request
+	files, err := f.fileProvider.List()
 	for _, file := range files {
 		fileBytes, err := f.fileProvider.GetFile(file)
 		if err != nil {
@@ -126,15 +133,15 @@ func (f *FileService) Upload(c *Context) error {
 
 	// Compute Merkle Tree
 	f.merkleTreeProvider.BuildTree()
-	log.Info().Msg(fmt.Sprintf("Merkle Root: %s", f.merkleTreeProvider.GetRootHash()))
+	log.Info().Msg(fmt.Sprintf("Merkle Root Hash: %s", f.merkleTreeProvider.GetRootHash()))
 	log.Debug().Msg(fmt.Sprintf("Uploading files to: %v", f.RoutePrefix))
 
 	// Send request
 	resp, err := request.Post(f.RoutePrefix)
-
 	if err != nil {
-		return err
+		return errors.New(fmt.Sprintf("Error uploading files: %v", err))
 	}
+
 	if resp.StatusCode() != http.StatusOK {
 		log.Info().Msg("Upload response: " + resp.String())
 		return errors.New(resp.String())
